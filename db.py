@@ -1,60 +1,43 @@
-import sqlite3
-import ConfigParser
-import os
-import sys
+from sqlalchemy import Column, Integer, String, Binary
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
+import crypto
+
+Base = declarative_base()
+Session = sessionmaker()
+
+passwd = "test"
+
+class Account(Base):
+    __tablename__ = 'account'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(250), nullable=False)
+    user = Column(String(250), nullable=False)
+    password = Column(Binary, nullable=False)
+
+    def __repr__(self):
+        return '<Name %r> <User %r> <Encrypted %r> <Decrypted %r>' % (self.name, self.user, self.password, crypto.decrypt(passwd, self.password))
 
 class Database:
-    _cfgfile = "vault.conf"
-    _tables = ["vault"]
-    _checkDbQuery = '''SELECT name FROM sqlite_master WHERE type='table';'''
-    _createDbQuery = '''CREATE TABLE IF NOT EXISTS vault (id integer unique primary key autoincrement, name text, user text, password text, url text, tag text)'''
+    engine = create_engine('sqlite:///vault.db', echo=True)
+    Session.configure(bind=engine)
 
-    def __init__(self):
-        self.config = ConfigParser.ConfigParser()
-        configPath = os.path.join(os.path.dirname(sys.argv[0]), self._cfgfile)
+    def create(self):
+        Base.metadata.create_all(self.engine)
 
-        if not os.path.isfile(configPath):
-            print "ERROR: no config file found in the application root"
-            sys.exit(1)
-
-        try:
-            fp = open(configPath, "r")
-            self.config.readfp(fp)
-            fp.close()
-        except IOError, e:
-            print "ERROR: could not read config file: ", str(e)
-            sys.exit(1)
-
-        self.dbname = self.config.get("vault", "dbname")
-
-        # get a db conn
-        conn = self.getDbConn()
-        # check if db's exists
-        if self.checkDb(conn):
-            print "INFO: databases ok!"
+    def session(self):
+        return Session()
     
-    def getDbConn(self):
-        # generates and returns a db connection
-        conn = sqlite3.connect(self.dbname)
-        return conn
+    def add(self, session, account):
+        session.add(account)
 
-    def checkDb(self, conn):
-        c = conn.cursor()
-        c.execute(self._checkDbQuery)
-        tables = c.fetchall()
-        # check if all tables exist, otherwise rebuild missing tables
-        if not all(e in [t[0] for t in tables] for e in self._tables):
-            print "INFO: creating database..."
-            self.createDb(conn)
-        conn.close()
-        return True
-
-    def createDb(self, conn):
-        c = conn.cursor()
-        c.execute(self._createDbQuery)
-        conn.commit()
 
 if __name__ == "__main__":
     db = Database()
-    #conn = db.getDbConn()
-    #db.checkDb(conn)
+    session = db.session()
+    a = Account(name="Github", user="piebob" password=crypto.encrypt(passwd,"testing"))
+    db.create()
+    db.add(session, a)
+    print(a)
+    session.commit()
