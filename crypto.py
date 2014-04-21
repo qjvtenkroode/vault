@@ -3,16 +3,16 @@ from Crypto import Random
 import md5
 
 def encrypt(passwd, raw):
-    cipher, iv = getCipher(passwd)
+    cipher, iv = get_cipher(passwd)
     msg = iv + cipher.encrypt(raw)
     return msg
 
 def decrypt(passwd, enc):
-    cipher, iv = getCipher(passwd)
+    cipher, iv = get_cipher(passwd)
     msg = cipher.decrypt(enc)[AES.block_size:]
     return msg
 
-def getCipher(passwd):
+def get_cipher(passwd):
     key = md5.md5(passwd).hexdigest()
     iv = Random.new().read(AES.block_size)
     cipher = AES.new(key, AES.MODE_CFB, iv)
